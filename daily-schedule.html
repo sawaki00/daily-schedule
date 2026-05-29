@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>一日設計アプリ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F2F2F7;
+  --surface: #FFFFFF;
+  --surface2: #F2F2F7;
+  --blue: #007AFF;
+  --purple: #5856D6;
+  --label: #000000;
+  --label3: #8E8E93;
+  --separator: #C6C6C8;
+  --red: #FF3B30;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Sans', sans-serif;
+  font-size: 14px;
+  color: var(--label);
+}
+
+.root { display: flex; min-height: 100%; background: var(--bg); }
+
+/* ========== タイムラインエリア ========== */
+.timeline-area {
+  flex: 1; padding: 20px 32px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  min-width: 0; align-items: stretch; background: var(--bg);
+}
+.tl-col { min-width: 0; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+
+/* ========== ヘッダー行 ========== */
+.tl-header { display: flex; align-items: center; gap: 6px; height: 40px; }
+
+/* ========== リキッドグラス共通ベース ========== */
+.glass-btn {
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+}
+
+.icon-btn {
+  font-size: 15px; font-weight: 600;
+  padding: 0 18px; height: 40px;
+  background: rgba(255,255,255,0.55);
+  border: 0.5px solid rgba(255,255,255,0.72); border-radius: 12px;
+  color: #1C1C1E; cursor: pointer;
+  white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;
+  font-family: inherit;
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 2px 12px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.90), inset 0 -0.5px 0 rgba(0,0,0,.04);
+  transition: box-shadow .15s, background .15s;
+}
+.icon-btn:hover {
+  background: rgba(255,255,255,0.80);
+  box-shadow: 0 4px 18px rgba(0,0,0,.09), inset 0 1px 0 rgba(255,255,255,1), inset 0 -0.5px 0 rgba(0,0,0,.05);
+}
+.icon-btn:active { background: rgba(255,255,255,0.45); box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+
+/* ========== タイムライン本体 ========== */
+.tl-wrap {
+  position: relative;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  overflow: hidden;
+}
+
+/* ========== 白エリア内タイトル ========== */
+.tl-title {
+  position: absolute; top: 16px; left: 32px; right: 0; z-index: 2;
+  text-align: left;
+  font-size: 16px; font-weight: 600;
+  color: #1C1C1E; letter-spacing: -.02em;
+  pointer-events: none;
+}
+
+/* ========== 日付表示（追加ボタン下） ========== */
+.tl-date {
+  font-size: 15px; font-weight: 500;
+  color: var(--label3);
+  line-height: 1;
+  padding: 22px 0 6px 2px; /* gap(10px) + 22px top = 32px visual / gap(10px) + 6px bottom = 16px visual */
+}
+
+/* ========== 書き出しボタン（追加ボタン右隣） ========== */
+.export-btn {
+  width: 40px; height: 40px;
+  background: rgba(255,255,255,0.55);
+  border: 0.5px solid rgba(255,255,255,0.72);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #1C1C1E;
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 2px 12px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.90), inset 0 -0.5px 0 rgba(0,0,0,.04);
+  transition: box-shadow .15s, background .15s;
+}
+.export-btn:hover {
+  background: rgba(255,255,255,0.80);
+  box-shadow: 0 4px 18px rgba(0,0,0,.09), inset 0 1px 0 rgba(255,255,255,1);
+}
+.export-btn:active { background: rgba(255,255,255,0.45); }
+
+/* ========== 夜設計エリア：未作成状態 ========== */
+.tl-wrap-pending {
+  background: var(--bg) !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(0,0,0,0.09) !important;
+}
+
+/* ========== 空エリア ========== */
+.tl-empty {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--label3);
+  text-align: center; padding: 16px; line-height: 1.6;
+  pointer-events: none;
+}
+.tl-empty.has-btn { pointer-events: auto; }
+
+/* ========== 時刻ライン ========== */
+.hour-tick { position: absolute; left: 32px; right: 32px; display: flex; align-items: flex-start; pointer-events: none; }
+.hour-num { width: 40px; text-align: right; font-size: 11px; color: var(--label3); padding-right: 8px; margin-top: -6px; flex-shrink: 0; }
+.hour-line-el { flex: 1; border-top: 0.5px solid var(--separator); }
+
+/* ========== スケジュールブロック ========== */
+.sched-block {
+  position: absolute; border-radius: 10px;
+  left: 80px; right: 32px;
+  display: flex; align-items: center; justify-content: flex-start;
+  padding: 0 12px 0 0; overflow: hidden; cursor: pointer;
+  transition: opacity .12s;
+}
+.sched-block:hover { opacity: .88; }
+.sched-block:active { opacity: .75; }
+.sched-bar {
+  width: 10px; align-self: stretch; flex-shrink: 0;
+  margin-right: 10px;
+}
+.sched-block-label { font-size: 12px; font-weight: 400; text-align: left; line-height: 1.3; pointer-events: none; }
+
+/* ========== 夜設計作成ボタン（icon-btn と同一プライマリスタイル） ========== */
+.btn-create-night {
+  font-size: 15px; font-weight: 600;
+  padding: 0 22px; height: 40px;
+  background: rgba(255,255,255,0.55);
+  border: 0.5px solid rgba(255,255,255,0.72); border-radius: 12px;
+  color: #1C1C1E; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit;
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 2px 12px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.90), inset 0 -0.5px 0 rgba(0,0,0,.04);
+  transition: box-shadow .15s, background .15s;
+}
+.btn-create-night:hover {
+  background: rgba(255,255,255,0.80);
+  box-shadow: 0 4px 18px rgba(0,0,0,.09), inset 0 1px 0 rgba(255,255,255,1);
+}
+.btn-create-night:active { background: rgba(255,255,255,0.45); box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+
+/* ========== オーバーレイ & ダイアログ ========== */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.4);
+  display: none; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.overlay.show { display: flex; }
+
+.dialog {
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(40px) saturate(1.8);
+  -webkit-backdrop-filter: blur(40px) saturate(1.8);
+  border: 0.5px solid rgba(255,255,255,0.80);
+  border-radius: 20px; padding: 32px 28px;
+  width: 600px; max-width: 92vw;
+  display: flex; flex-direction: column; gap: 14px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,1);
+}
+.dialog-title { font-size: 17px; font-weight: 700; color: var(--label); letter-spacing: -.02em; }
+.dlg-label { font-size: 11px; color: var(--label3); margin-bottom: 5px; display: block; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+
+.dialog select { width: 100%; font-size: 14px; padding: 10px 46px 10px 12px; }
+.dialog input[type="text"] { width: 100%; font-size: 14px; padding: 10px 12px; }
+.dialog select,
+.dialog input[type="text"] {
+  border: 0.5px solid var(--separator); border-radius: 10px;
+  background: var(--surface2); color: var(--label);
+  outline: none; font-family: inherit;
+}
+.dialog select:focus, .dialog input:focus {
+  border-color: rgba(0,0,0,0.32);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+}
+
+.time-row { display: flex; gap: 10px; }
+.time-row > div { flex: 1; }
+
+.dialog-btns { display: flex; gap: 10px; margin-top: 4px; }
+.dialog-btns button {
+  flex: 1; padding: 12px; border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  transition: box-shadow .15s, background .15s;
+}
+.btn-cancel {
+  background: rgba(240,240,245,0.60);
+  border: 0.5px solid rgba(255,255,255,0.65);
+  color: #3C3C43;
+  box-shadow: 0 2px 8px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.85);
+}
+.btn-cancel:hover { background: rgba(240,240,245,0.85); }
+.btn-primary {
+  background: rgba(20,20,22,0.82);
+  border: 0.5px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.95);
+  box-shadow: 0 2px 12px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.10);
+}
+.btn-primary:hover { background: rgba(20,20,22,0.92); box-shadow: 0 4px 16px rgba(0,0,0,.28); }
+.btn-primary:active { background: rgba(20,20,22,0.70); }
+.btn-delete {
+  background: rgba(255,59,48,0.08); color: var(--red); width: 100%;
+  border: 0.5px solid rgba(255,59,48,0.22) !important;
+  box-shadow: 0 2px 8px rgba(255,59,48,.06);
+}
+.btn-delete:hover { background: rgba(255,59,48,0.14); }
+
+.dialog-divider { border: none; border-top: 0.5px solid var(--separator); margin: 0; }
+
+.note { font-size: 12px; color: #3C3C43; background: rgba(60,60,67,.07); border-radius: 8px; padding: 8px 10px; display: none; line-height: 1.5; }
+.note.show { display: block; }
+.err-note { font-size: 12px; color: var(--red); background: rgba(255,59,48,.08); border-radius: 8px; padding: 8px 10px; display: none; line-height: 1.5; }
+.err-note.show { display: block; }
+
+/* ========== プリセットチップ（追加ダイアログ内） ========== */
+.preset-chips-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset-chip {
+  display: inline-flex; align-items: center;
+  background: rgba(0,0,0,0.05); border: 0.5px solid rgba(0,0,0,0.10);
+  border-radius: 20px; padding: 5px 12px;
+  font-size: 12px; font-weight: 500; color: var(--label);
+  cursor: pointer; font-family: inherit; transition: background .12s;
+}
+.preset-chip:hover { background: rgba(0,0,0,0.10); }
+.preset-chip:active { background: rgba(0,0,0,0.16); }
+
+/* ========== プリセット設定ダイアログ ========== */
+.settings-scroll { overflow-y: auto; max-height: 60vh; display: flex; flex-direction: column; gap: 0; }
+.settings-section { padding: 14px 0; display: flex; flex-direction: column; gap: 10px; }
+.settings-section + .settings-section { border-top: 0.5px solid var(--separator); }
+.settings-type-lbl { font-size: 11px; font-weight: 600; color: var(--label3); text-transform: uppercase; letter-spacing: .06em; }
+.settings-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 20px; }
+.s-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.05); border: 0.5px solid rgba(0,0,0,0.10);
+  border-radius: 20px; padding: 5px 8px 5px 12px;
+  font-size: 12px; font-weight: 500; color: var(--label);
+}
+.s-chip-del {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: rgba(0,0,0,0.14); color: white; border: none;
+  cursor: pointer; font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; flex-shrink: 0; font-family: inherit; line-height: 1;
+  transition: background .12s;
+}
+.s-chip-del:hover { background: var(--red); }
+.s-empty-note { font-size: 12px; color: var(--label3); }
+.s-add-row { display: flex; gap: 8px; }
+.s-add-input {
+  flex: 1; font-size: 13px; padding: 8px 12px;
+  border: 0.5px solid var(--separator); border-radius: 10px;
+  background: var(--surface2); color: var(--label);
+  outline: none; font-family: inherit;
+}
+.s-add-input:focus { border-color: rgba(0,0,0,0.32); box-shadow: 0 0 0 3px rgba(0,0,0,0.06); }
+.s-add-btn {
+  padding: 0 16px; height: 36px; white-space: nowrap;
+  background: rgba(255,255,255,0.55); border: 0.5px solid rgba(255,255,255,0.72);
+  border-radius: 10px; font-size: 13px; font-weight: 600; color: #1C1C1E;
+  cursor: pointer; font-family: inherit;
+  backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 2px 8px rgba(0,0,0,.06), inset 0 1px rgba(255,255,255,.9);
+  transition: background .12s;
+}
+.s-add-btn:hover { background: rgba(255,255,255,0.80); }
+</style>
+</head>
+<body>
+
+<div class="root">
+  <div class="timeline-area">
+
+    <!-- 朝設計 -->
+    <div class="tl-col" id="col-m">
+      <div class="tl-header">
+        <button class="icon-btn" onclick="openAddDialog('m')">+ 追加</button>
+        <button class="export-btn" onclick="openSettingsDialog()" title="プリセットラベル設定">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <button class="export-btn" onclick="doExport('morning')" title="朝設計を書き出す">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+      </div>
+      <div class="tl-date" id="tl-date-m"></div>
+      <div class="tl-wrap" id="tl-m"></div>
+    </div>
+
+    <!-- 夜設計 -->
+    <div class="tl-col" id="col-e">
+      <div class="tl-header" id="hdr-e" style="visibility:hidden;">
+        <button class="icon-btn" onclick="openAddDialog('e')">+ 追加</button>
+        <button class="export-btn" onclick="doExport('both')" title="朝設計＋夜設計を書き出す">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+      </div>
+      <!-- 朝設計の日付エリアと高さを揃えるための不可視スペーサー -->
+      <div class="tl-date" aria-hidden="true" style="visibility:hidden;">dummy</div>
+      <div class="tl-wrap tl-wrap-pending" id="tl-e"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 追加ダイアログ -->
+<div class="overlay" id="overlay-add" onclick="handleOverlayClick(event,'overlay-add')">
+  <div class="dialog">
+    <div class="dialog-title" id="add-dialog-title">ブロックを追加</div>
+    <div><label class="dlg-label">種類</label><select id="add-type" onchange="updatePresetChips()"></select></div>
+    <div id="add-presets-section" style="display:none;">
+      <label class="dlg-label">よく使うラベル</label>
+      <div id="add-presets" class="preset-chips-wrap"></div>
+    </div>
+    <div><label class="dlg-label">ラベル</label><input type="text" id="add-label" placeholder="例：朝設計・連絡対応"></div>
+    <div class="time-row">
+      <div><label class="dlg-label">開始</label><select id="add-start"></select></div>
+      <div><label class="dlg-label">終了</label><select id="add-end"></select></div>
+    </div>
+    <div class="err-note" id="add-err"></div>
+    <div class="dialog-btns">
+      <button class="btn-cancel" onclick="closeDialog('overlay-add')">キャンセル</button>
+      <button class="btn-primary" onclick="commitAdd()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 編集ダイアログ -->
+<div class="overlay" id="overlay-edit" onclick="handleOverlayClick(event,'overlay-edit')">
+  <div class="dialog">
+    <div class="dialog-title">ブロックを編集</div>
+    <div><label class="dlg-label">種類</label><select id="edit-type"></select></div>
+    <div><label class="dlg-label">ラベル</label><input type="text" id="edit-label"></div>
+    <div class="time-row">
+      <div><label class="dlg-label">開始</label><select id="edit-start" onchange="previewPush()"></select></div>
+      <div><label class="dlg-label">終了</label><select id="edit-end" onchange="previewPush()"></select></div>
+    </div>
+    <div class="note" id="push-note"></div>
+    <div class="dialog-btns">
+      <button class="btn-cancel" onclick="closeDialog('overlay-edit')">キャンセル</button>
+      <button class="btn-primary" onclick="saveEdit()">保存</button>
+    </div>
+    <hr class="dialog-divider">
+    <div class="dialog-btns">
+      <button class="btn-delete" onclick="deleteBlock()">このブロックを削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- プリセットラベル設定ダイアログ -->
+<div class="overlay" id="overlay-settings" onclick="handleOverlayClick(event,'overlay-settings')">
+  <div class="dialog">
+    <div class="dialog-title">プリセットラベル設定</div>
+    <div class="settings-scroll" id="settings-content"></div>
+    <div class="dialog-btns" style="margin-top:8px;">
+      <button class="btn-primary" onclick="closeDialog('overlay-settings')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TIME_MIN = 0, TIME_MAX = 27, PPH = 60, PAD = 68;
+// PAD=60: top offset inside white area (title 16px + ~19px height + 24px gap ≈ 60px)
+let nid = 1, editingTab = null, editingId = null, addingTab = 'm', nightCreated = false;
+
+// ========== プリセットラベル ==========
+function loadPresets() {
+  try { const s = localStorage.getItem('dl_presets'); if (s) return JSON.parse(s); } catch(e) {}
+  return Object.fromEntries(Object.keys(TYPES).map(k => [k, []]));
+}
+// TYPES 定義後に初期化するため変数宣言のみ
+let presetLabels = {};
+
+function savePresets() {
+  try { localStorage.setItem('dl_presets', JSON.stringify(presetLabels)); } catch(e) {}
+}
+
+function updatePresetChips() {
+  const type = document.getElementById('add-type').value;
+  const wrap = document.getElementById('add-presets');
+  const section = document.getElementById('add-presets-section');
+  wrap.innerHTML = '';
+  const labels = (presetLabels[type] || []);
+  if (!labels.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  labels.forEach(lbl => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-chip'; btn.textContent = lbl; btn.type = 'button';
+    btn.onclick = () => { document.getElementById('add-label').value = lbl; };
+    wrap.appendChild(btn);
+  });
+}
+
+function openSettingsDialog() {
+  renderSettingsContent();
+  document.getElementById('overlay-settings').className = 'overlay show';
+}
+
+function renderSettingsContent() {
+  const cont = document.getElementById('settings-content');
+  cont.innerHTML = '';
+  Object.entries(TYPES).forEach(([key, typeObj]) => {
+    const sec = document.createElement('div'); sec.className = 'settings-section';
+    const lbl = document.createElement('div'); lbl.className = 'settings-type-lbl'; lbl.textContent = typeObj.label;
+    sec.appendChild(lbl);
+    const chips = document.createElement('div'); chips.className = 'settings-chips'; chips.id = `sc-${key}`;
+    refreshSettingsChips(key, chips);
+    sec.appendChild(chips);
+    const row = document.createElement('div'); row.className = 's-add-row';
+    const inp = document.createElement('input'); inp.className = 's-add-input'; inp.placeholder = 'ラベルを入力...'; inp.id = `si-${key}`;
+    inp.onkeydown = e => { if (e.key === 'Enter') e.preventDefault(); };
+    const btn = document.createElement('button'); btn.className = 's-add-btn'; btn.textContent = '+ 追加'; btn.type = 'button';
+    btn.onclick = () => addPreset(key);
+    row.appendChild(inp); row.appendChild(btn); sec.appendChild(row);
+    cont.appendChild(sec);
+  });
+}
+
+function refreshSettingsChips(key, container) {
+  if (!container) container = document.getElementById(`sc-${key}`);
+  if (!container) return;
+  container.innerHTML = '';
+  const labels = presetLabels[key] || [];
+  if (!labels.length) {
+    const n = document.createElement('div'); n.className = 's-empty-note'; n.textContent = 'プリセットなし';
+    container.appendChild(n); return;
+  }
+  labels.forEach((lbl, i) => {
+    const chip = document.createElement('div'); chip.className = 's-chip';
+    const span = document.createElement('span'); span.textContent = lbl;
+    const del = document.createElement('button'); del.className = 's-chip-del'; del.textContent = '×'; del.type = 'button';
+    del.onclick = () => deletePreset(key, i);
+    chip.appendChild(span); chip.appendChild(del); container.appendChild(chip);
+  });
+}
+
+function addPreset(key) {
+  const inp = document.getElementById(`si-${key}`);
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!presetLabels[key]) presetLabels[key] = [];
+  if (!presetLabels[key].includes(val)) { presetLabels[key].push(val); savePresets(); refreshSettingsChips(key); }
+  inp.value = ''; inp.focus();
+}
+
+function deletePreset(key, index) {
+  if (!presetLabels[key]) return;
+  presetLabels[key].splice(index, 1);
+  savePresets(); refreshSettingsChips(key);
+}
+
+const TYPES = {
+  'int-work': { label: '社内_作業',         barBg: '#0BC379', bg: '#DEF9E7', tc: '#000000' },
+  'int-mtg':  { label: '社内_MTG',          barBg: '#0BC379', bg: '#AFEFC3', tc: '#000000' },
+  'ext-work': { label: '社外_作業',         barBg: '#0BB9C3', bg: '#D6F8FA', tc: '#000000' },
+  'ext-mtg':  { label: '社外_MTG',          barBg: '#0BB9C3', bg: '#AFECEF', tc: '#000000' },
+  'event':    { label: 'イベント・重要な予定', barBg: '#C4E521', bg: '#E4EE92', tc: '#000000' },
+  'other':    { label: 'その他',            barBg: '#8C8C8C', bg: '#E4E4E4', tc: '#000000' },
+};
+
+// TYPES 定義後に presetLabels を初期化
+presetLabels = loadPresets();
+
+let data = { m: [], e: [] };
+
+function getTodayLabel() {
+  const d = new Date();
+  const days = ['日','月','火','水','木','金','土'];
+  return `${d.getMonth()+1}月${d.getDate()}日（${days[d.getDay()]}）`;
+}
+
+function fmtH(h) {
+  const hh = Math.floor(h) % 24;
+  const mm = h % 1 === .5 ? '30' : '00';
+  return `${String(hh).padStart(2,'0')}:${mm}`;
+}
+
+function calcSharedRange() {
+  const tabs = nightCreated ? ['m','e'] : ['m'];
+  const all = tabs.flatMap(t => data[t]);
+  if (!all.length) return { start: 9, end: 20 };
+  const start = Math.floor(Math.min(...all.map(b => b.s)));
+  const end = Math.max(start + 1, Math.ceil(Math.max(...all.map(b => b.e)) * 2) / 2);
+  return { start, end };
+}
+
+function hToY(h, start) { return Math.round((h - start) * PPH) + PAD; }
+
+function buildTypeOpts(selId, val) {
+  const sel = document.getElementById(selId); sel.innerHTML = '';
+  Object.entries(TYPES).forEach(([k,t]) => {
+    const o = document.createElement('option'); o.value = k; o.textContent = t.label; sel.appendChild(o);
+  });
+  if (val) sel.value = val;
+}
+
+function buildTimeOpts(selId, val) {
+  const sel = document.getElementById(selId); sel.innerHTML = '';
+  for (let h = TIME_MIN; h <= TIME_MAX; h += .5) {
+    const o = document.createElement('option'); o.value = h; o.textContent = fmtH(h); sel.appendChild(o);
+  }
+  sel.value = val;
+}
+
+function openAddDialog(tab) {
+  addingTab = tab;
+  document.getElementById('add-dialog-title').textContent = tab === 'm' ? '朝設計にブロックを追加' : '夜設計にブロックを追加';
+  buildTypeOpts('add-type');
+  document.getElementById('add-label').value = '';
+  const blocks = data[tab];
+  const lastE = blocks.length ? Math.max(...blocks.map(b => b.e)) : 9;
+  buildTimeOpts('add-start', Math.min(lastE, TIME_MAX - .5));
+  buildTimeOpts('add-end', Math.min(lastE + 1, TIME_MAX));
+  document.getElementById('add-err').className = 'err-note';
+  updatePresetChips();
+  document.getElementById('overlay-add').className = 'overlay show';
+}
+
+function commitAdd() {
+  const type = document.getElementById('add-type').value;
+  const label = document.getElementById('add-label').value.trim() || TYPES[type].label;
+  const s = parseFloat(document.getElementById('add-start').value);
+  const e = parseFloat(document.getElementById('add-end').value);
+  const errEl = document.getElementById('add-err');
+  if (e <= s) { errEl.textContent = '終了は開始より後にしてください'; errEl.className = 'err-note show'; return; }
+  if (data[addingTab].some(b => s < b.e && e > b.s)) { errEl.textContent = '他のブロックと時間が重なっています'; errEl.className = 'err-note show'; return; }
+  data[addingTab].push({ id: nid++, type, label, s, e });
+  data[addingTab].sort((a,b) => a.s - b.s);
+  closeDialog('overlay-add');
+  renderAll();
+}
+
+function createNight() {
+  if (data.m.length === 0) { alert('先に朝設計のブロックを追加してください'); return; }
+  data.e = data.m.map(b => ({ ...b, id: nid++ }));
+  nightCreated = true;
+  document.getElementById('hdr-e').style.visibility = '';
+  document.getElementById('tl-e').classList.remove('tl-wrap-pending');
+  renderAll();
+}
+
+function openEditDialog(tab, id) {
+  const b = data[tab].find(x => x.id === id); if (!b) return;
+  editingTab = tab; editingId = id;
+  buildTypeOpts('edit-type', b.type);
+  document.getElementById('edit-label').value = b.label;
+  buildTimeOpts('edit-start', b.s);
+  buildTimeOpts('edit-end', b.e);
+  document.getElementById('push-note').className = 'note';
+  document.getElementById('overlay-edit').className = 'overlay show';
+}
+
+function closeDialog(id) {
+  document.getElementById(id).className = 'overlay';
+  if (id === 'overlay-edit') { editingTab = null; editingId = null; }
+}
+
+function handleOverlayClick(e, id) {
+  if (e.target === document.getElementById(id)) closeDialog(id);
+}
+
+function previewPush() {
+  if (!editingTab || !editingId) return;
+  const s = parseFloat(document.getElementById('edit-start').value);
+  const e = parseFloat(document.getElementById('edit-end').value);
+  const note = document.getElementById('push-note');
+  if (e <= s) { note.className = 'note'; return; }
+  const wp = data[editingTab].filter(b => b.id !== editingId && b.s < e && b.e > s && !(b.s >= s && b.e <= e));
+  if (wp.length) { note.textContent = wp.map(b => b.label).join('、') + ' を後ろにずらします'; note.className = 'note show'; }
+  else note.className = 'note';
+}
+
+function pushBlocks(blocks, editId, newS, newE) {
+  const others = blocks.filter(b => b.id !== editId).sort((a,b) => a.s - b.s);
+  let cursor = newE; const result = [];
+  others.forEach(b => {
+    if (b.s >= newS && b.e <= newE) return;
+    if (b.s < newE && b.e > newS) { const d = b.e - b.s, ns = Math.max(cursor, newE), ne = ns + d; result.push({ ...b, s: ns, e: ne }); cursor = ne; }
+    else if (b.s >= newE && b.s < cursor) { const d = b.e - b.s, ns = cursor, ne = ns + d; result.push({ ...b, s: ns, e: ne }); cursor = ne; }
+    else { result.push(b); if (b.e > cursor) cursor = b.e; }
+  });
+  return result;
+}
+
+function saveEdit() {
+  const type = document.getElementById('edit-type').value;
+  const label = document.getElementById('edit-label').value.trim() || TYPES[type].label;
+  const s = parseFloat(document.getElementById('edit-start').value);
+  const e = parseFloat(document.getElementById('edit-end').value);
+  const note = document.getElementById('push-note');
+  if (e <= s) { note.textContent = '終了は開始より後にしてください'; note.className = 'note show'; return; }
+  const pushed = pushBlocks(data[editingTab], editingId, s, e);
+  const edited = { ...data[editingTab].find(x => x.id === editingId), type, label, s, e };
+  data[editingTab] = [edited, ...pushed].sort((a,b) => a.s - b.s);
+  closeDialog('overlay-edit');
+  renderAll();
+}
+
+function deleteBlock() {
+  data[editingTab] = data[editingTab].filter(b => b.id !== editingId);
+  closeDialog('overlay-edit');
+  renderAll();
+}
+
+function renderTL(tab, tlId, ss, se, tlH) {
+  const tl = document.getElementById(tlId);
+  tl.style.height = tlH + 'px';
+  tl.innerHTML = '';
+
+  // タイトル（未作成の夜設計エリアには表示しない）
+  if (tab === 'm' || nightCreated) {
+    const titleEl = document.createElement('div');
+    titleEl.className = 'tl-title';
+    titleEl.textContent = tab === 'm' ? '朝設計' : '夜設計';
+    tl.appendChild(titleEl);
+  }
+
+  if (!data[tab].length) {
+    const empty = document.createElement('div');
+    if (tab === 'e' && !nightCreated) {
+      empty.className = 'tl-empty has-btn';
+      const btn = document.createElement('button');
+      btn.className = 'btn-create-night';
+      btn.textContent = '夜設計を作成する';
+      btn.onclick = createNight;
+      empty.appendChild(btn);
+    } else {
+      empty.className = 'tl-empty';
+      empty.textContent = '「追加」からスケジュールを追加してください';
+    }
+    tl.appendChild(empty);
+    return;
+  }
+
+  // ブロックあり: 明示的な高さを持つ inner wrapper でスクロール内容を管理
+  const inner = document.createElement('div');
+  inner.style.cssText = `position:relative;width:100%;height:${tlH}px;`;
+
+  for (let h = ss; h <= se; h++) {
+    const y = hToY(h, ss);
+    const tick = document.createElement('div');
+    tick.className = 'hour-tick';
+    tick.style.cssText = `position:absolute;left:32px;right:32px;top:${y}px;`;
+    const num = document.createElement('div'); num.className = 'hour-num'; num.textContent = fmtH(h);
+    const line = document.createElement('div'); line.className = 'hour-line-el';
+    tick.appendChild(num); tick.appendChild(line); inner.appendChild(tick);
+  }
+  data[tab].forEach(b => {
+    const t = TYPES[b.type];
+    const top = hToY(b.s, ss) + 1, bot = hToY(b.e, ss) - 1, bh = Math.max(bot - top, 24);
+    const el = document.createElement('div'); el.className = 'sched-block';
+    el.style.cssText = `top:${top}px;height:${bh}px;background:${t.bg};color:${t.tc};`;
+    el.onclick = () => openEditDialog(tab, b.id);
+    const bar = document.createElement('div'); bar.className = 'sched-bar'; bar.style.background = t.barBg;
+    const ll = document.createElement('div'); ll.className = 'sched-block-label'; ll.textContent = b.label;
+    el.appendChild(bar); el.appendChild(ll); inner.appendChild(el);
+  });
+  tl.appendChild(inner);
+}
+
+function renderAll() {
+  const { start, end } = calcSharedRange();
+  const all = [...data.m, ...(nightCreated ? data.e : [])];
+  let tlH;
+  if (all.length) {
+    tlH = (end - start) * PPH + PAD * 2;
+  } else {
+    // tl-wrap の実際の上端位置を計測してビューポートに収まる高さを算出
+    const tlTop = document.getElementById('tl-m').getBoundingClientRect().top;
+    tlH = Math.max(200, window.innerHeight - tlTop - 20); // 20 = timeline-area padding-bottom
+  }
+  renderTL('m', 'tl-m', start, end, tlH);
+  renderTL('e', 'tl-e', start, end, tlH);
+}
+
+// Export: auto-detects whether to include night based on nightCreated
+function buildColNode(title, tab, _badgeBg, ss, se) {
+  const EP = 68; // top padding inside export white area (タイトルのみ、日付は白エリア外)
+  const EX = 32; // left/right padding inside export white area
+  const tlH = (se - ss) * PPH + EP + 24; // EP top + 24 bottom
+  const colDiv = document.createElement('div');
+  // メインUIの .tl-col と同じ gap:10px で date → tlWrap を縦並び
+  colDiv.style.cssText = 'flex:1;min-width:560px;display:flex;flex-direction:column;gap:10px;';
+
+  // 日付エリア（メインUIの .tl-date と同一スタイル）白エリアの外に配置
+  const dateDiv = document.createElement('div');
+  // padding: 22px 0 6px 2px はメインUIと同じ
+  dateDiv.style.cssText = 'font-size:15px;font-weight:500;color:#8E8E93;line-height:1;padding:22px 0 6px 2px;font-family:-apple-system,sans-serif;';
+  if (tab === 'm') {
+    dateDiv.textContent = getTodayLabel();
+  } else {
+    // 夜設計: 高さを朝設計と揃えるための不可視スペーサー
+    dateDiv.style.visibility = 'hidden';
+    dateDiv.textContent = getTodayLabel();
+  }
+  colDiv.appendChild(dateDiv);
+
+  const tlWrap = document.createElement('div');
+  tlWrap.style.cssText = `position:relative;background:#FFFFFF;height:${tlH}px;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);`;
+  // タイトル（白エリア内左上、メインUIの .tl-title と同一スタイル）
+  const titleDiv = document.createElement('div');
+  titleDiv.style.cssText = `position:absolute;top:16px;left:${EX}px;font-size:16px;font-weight:600;color:#1C1C1E;letter-spacing:-.02em;font-family:-apple-system,sans-serif;`;
+  titleDiv.textContent = title;
+  tlWrap.appendChild(titleDiv);
+  const yOf = h => Math.round((h - ss) * PPH) + EP;
+  for (let h = ss; h <= se; h++) {
+    const y = yOf(h);
+    const lbl = document.createElement('div');
+    lbl.style.cssText = `position:absolute;left:${EX}px;width:40px;top:${y}px;text-align:right;font-size:11px;color:#8E8E93;transform:translateY(-50%);padding-right:8px;`;
+    lbl.textContent = fmtH(h);
+    const line = document.createElement('div');
+    line.style.cssText = `position:absolute;left:${EX+44}px;right:${EX}px;top:${y}px;border-top:0.5px solid #C6C6C8;`;
+    tlWrap.appendChild(lbl); tlWrap.appendChild(line);
+  }
+  data[tab].forEach(b => {
+    const t = TYPES[b.type];
+    const top = yOf(b.s) + 1, bot = yOf(b.e) - 1, bh = Math.max(bot - top, 24);
+    const el = document.createElement('div');
+    el.style.cssText = `position:absolute;left:${EX+48}px;right:${EX}px;top:${top}px;height:${bh}px;background:${t.bg};color:${t.tc};border-radius:10px;display:flex;align-items:center;justify-content:flex-start;padding:0 12px 0 0;overflow:hidden;`;
+    const barEl = document.createElement('div');
+    barEl.style.cssText = `width:10px;align-self:stretch;flex-shrink:0;margin-right:10px;background:${t.barBg};`;
+    const ll = document.createElement('div');
+    ll.style.cssText = 'font-size:12px;font-weight:400;text-align:left;line-height:1.3;font-family:-apple-system,sans-serif;';
+    ll.textContent = b.label;
+    el.appendChild(barEl); el.appendChild(ll); tlWrap.appendChild(el);
+  });
+  colDiv.appendChild(tlWrap); return colDiv;
+}
+
+async function doExport(type) {
+  const exportBoth = type === 'both';
+  const all = [...data.m, ...(exportBoth ? data.e : [])];
+  let ss = 9, se = 10;
+  if (all.length) {
+    ss = Math.floor(Math.min(...all.map(b => b.s)));
+    se = Math.ceil(Math.max(...all.map(b => b.e)));
+  }
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;gap:20px;background:#F2F2F7;padding:24px;border-radius:20px;font-family:-apple-system,sans-serif;position:fixed;left:-9999px;top:0;';
+  wrap.appendChild(buildColNode('朝設計', 'm', '#007AFF', ss, se));
+  if (exportBoth) wrap.appendChild(buildColNode('夜設計', 'e', '#5856D6', ss, se));
+  document.body.appendChild(wrap);
+  await new Promise(r => setTimeout(r, 200));
+  try {
+    const canvas = await html2canvas(wrap, { backgroundColor: '#F2F2F7', scale: 2 });
+    const a = document.createElement('a');
+    a.download = (exportBoth ? '朝設計_夜設計' : '朝設計') + '.png';
+    a.href = canvas.toDataURL('image/png'); a.click();
+  } catch(err) { alert('エラーが発生しました: ' + err.message); }
+  document.body.removeChild(wrap);
+}
+
+window.addEventListener('resize', renderAll);
+document.getElementById('tl-date-m').textContent = getTodayLabel();
+renderAll();
+</script>
+</body>
+</html>
